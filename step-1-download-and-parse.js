@@ -157,23 +157,36 @@ async function saveData(station, data) {
   )
 }
 
-const queue = new Queue({ concurrency: 8 })
+async function processStation(station) {
+  // console.log(`Processing ${station.id}`)
+  const data = await fetchDlyFile(station.id)
+  const parsed = parseDlyFile(data)
+  const tmax = parsed.filter((d) => d.element === "TMAX")
+  const maxYear = max(tmax, (d) => parseInt(d.year))
+  const isActiveStation = maxYear === 2020
+  // console.log(station.id, { maxYear, isActiveStation })
+
+  if (!isActiveStation) return
+  activeStations += 1
+  await saveData(station, parsed)
+}
+
+const queue = new Queue({ concurrency: 16 })
 let activeStations = 0
 
 stations.forEach(async (station) => {
-  queue.add(async () => {
-    console.log(`Processing ${station.id}`)
-    const data = await fetchDlyFile(station.id)
-    const parsed = parseDlyFile(data)
-    const tmax = parsed.filter(d => d.element === 'TMAX')
-    const maxYear = max(tmax, (d) => parseInt(d.year))
-    const isActiveStation = maxYear === 2020
-    console.log(station.id, maxYear, isActiveStation)
-
-    if (!isActiveStation) return
-    activeStations += 1
-    await saveData(station, parsed)
-  })
+  async function go() {
+    try {
+      await processStation(station)
+      console.log(`✅ ${station.id}`)
+    } catch (e) {
+      console.error(
+        `❌ ${station.id} - adding back to the queue\n\t${e}`
+      )
+      queue.add(go)
+    }
+  }
+  queue.add(go)
 })
 
 queue.onIdle().then(() => {

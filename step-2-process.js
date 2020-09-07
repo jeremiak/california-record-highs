@@ -62,6 +62,8 @@ glob("data/*.json", async (err, files) => {
           hottestTempSeptember[1] === "09" && hottestTempSeptember[2] === "2020",
         records: [hottestTempAllTime, hottestTempSeptember, hottestTempToday],
       }
+
+      console.log(`Processed ${id}`)
     })
   })
 
